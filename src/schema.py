@@ -32,6 +32,8 @@ class User:
     class UserCreate(UserBase):
         password: str
 
+    class UserUpdate(UserBase):
+        password: str
 
     class UserResponse(UserBase):
         id: int

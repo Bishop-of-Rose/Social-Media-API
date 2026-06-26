@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .router import post, user, auth, vote
+from .routers import post, user, auth, vote
 
 origins = ["*"]
 app = FastAPI()
@@ -14,12 +14,10 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
-app.include_router(post.router)
-app.include_router(user.router)
-app.include_router(auth.router)
-app.include_router(vote.router)
+app.include_router(post.route)
+app.include_router(user.route)
+app.include_router(auth.route)
+app.include_router(vote.route)
 @app.get("/")
-def default():
+def root():
     return {'message': 'hello world'}
-
-

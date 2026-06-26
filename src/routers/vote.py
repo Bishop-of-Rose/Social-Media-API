@@ -4,13 +4,14 @@ from sqlalchemy.orm import Session
 from .. import model, schema, database
 from ..util import jwtUtil
 
-router = APIRouter(
+route = APIRouter(
     prefix='/votes',
     tags=['Votes']
 )
 
-@router.post("", status_code=status.HTTP_204_NO_CONTENT)
-def create_vote(vote: schema.Vote.VoteBase, session: Session = Depends(database.get_session), current_user = Depends(jwtUtil.get_current_user)):
+@route.post("", status_code=status.HTTP_204_NO_CONTENT)
+def vote(vote: schema.Vote.VoteBase, session: Session = Depends(database.get_session),
+         current_user = Depends(jwtUtil.get_current_user)):
     post_query = session.query(model.Post).filter(model.Post.id == vote.post_id)
     if not post_query.first():
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
