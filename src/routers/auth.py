@@ -1,7 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Response
 from fastapi.security.oauth2 import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
-from sqlalchemy.sql.operators import and_
 
 from ..config import settings
 from ..util import passwordUtil, jwtUtil
@@ -54,7 +53,7 @@ def logout(response: Response, refresh_payload: dict = Depends(jwtUtil.verify_re
            session: Session = Depends(database.get_session), current_user = Depends(jwtUtil.get_current_user)):
     jti = refresh_payload.get("jti")
     user_id = refresh_payload.get("sub")
-    
+
     if not str(current_user.id) == user_id:
         print(current_user.id, user_id, type(current_user.id), type(user_id))
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
