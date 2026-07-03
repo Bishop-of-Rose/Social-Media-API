@@ -4,27 +4,28 @@ from sqlalchemy.orm import Session
 
 from .. import model, schema, database
 from ..util import jwtUtil
+from ..controllers import post_controller
 
-route = APIRouter(
+router = APIRouter(
     prefix='/posts',
     tags = ['Posts']
 )
 
-@route.get("", response_model=List[schema.Post.PostResponse])
+@router.get("", response_model=List[schema.Post.PostResponse])
 def filter_post(session: Session = Depends(database.get_session), current_user = Depends(jwtUtil.get_current_user),
                 skip: int = 0, limit: int = 10, search: Optional[str] = ""):
-    posts = session.query(model.Post).filter(model.Post.title.contains(search)).limit(limit).offset(skip).all()
-    return posts
+    return post_controller.filter_posts(model, session, current_user, skip, limit, search)
 
-@route.post("", status_code=status.HTTP_201_CREATED, response_model=schema.Post.PostResponse)
-def create_post(post: schema.Post.PostCreate, session: Session = Depends(database.get_session), current_user = Depends(jwtUtil.get_current_user)):
+@router.post("", status_code=status.HTTP_201_CREATED, response_model=schema.Post.PostResponse)
+def create_post(post: schema.Post.PostCreate, session: Session = Depends(database.get_session),
+                current_user = Depends(jwtUtil.get_current_user)):
     post = model.Post(**post.dict(), post_user_id = current_user.id)
     session.add(post)
     session.commit()
     session.refresh(post)
     return post
 
-@route.get("/{post_id}", response_model=schema.Post.PostResponse)
+@router.get("/{post_id}", response_model=schema.Post.PostResponse)
 def read_post(post_id: int, session: Session = Depends(database.get_session), current_user = Depends(jwtUtil.get_current_user)):
     query = session.query(model.Post).filter(model.Post.id == post_id)
     post = query.first()
@@ -34,7 +35,7 @@ def read_post(post_id: int, session: Session = Depends(database.get_session), cu
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail=f"Post with <id: {post_id}> not found")
 
-@route.put("/{post_id}", status_code=status.HTTP_201_CREATED, response_model=schema.Post.PostResponse)
+@router.put("/{post_id}", status_code=status.HTTP_201_CREATED, response_model=schema.Post.PostResponse)
 def update_post(post_id: int, edit: schema.Post.PostUpdate, session: Session = Depends(database.get_session),
                 current_user = Depends(jwtUtil.get_current_user)):
     query = session.query(model.Post).filter(model.Post.id == post_id)
@@ -52,7 +53,7 @@ def update_post(post_id: int, edit: schema.Post.PostUpdate, session: Session = D
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail=f"Post with <id: {post_id}> not found")
 
-@route.delete("/{post_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{post_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_post(post_id: int, session: Session = Depends(database.get_session), current_user = Depends(jwtUtil.get_current_user)):
     query = session.query(model.Post).filter(model.Post.id == post_id)
     post = query.first()

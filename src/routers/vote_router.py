@@ -4,12 +4,12 @@ from sqlalchemy.orm import Session
 from .. import model, schema, database
 from ..util import jwtUtil
 
-route = APIRouter(
+router = APIRouter(
     prefix='/votes',
     tags=['Votes']
 )
 
-@route.post("", status_code=status.HTTP_204_NO_CONTENT)
+@router.post("")
 def vote(vote: schema.Vote.VoteBase, session: Session = Depends(database.get_session),
          current_user = Depends(jwtUtil.get_current_user)):
     post_query = session.query(model.Post).filter(model.Post.id == vote.post_id)

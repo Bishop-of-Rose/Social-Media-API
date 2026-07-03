@@ -6,12 +6,12 @@ from ..config import settings
 from ..util import passwordUtil, jwtUtil
 from .. import database, schema, model
 
-route = APIRouter(
+router = APIRouter(
     prefix='/auth',
     tags=['Authentication']
 )
 
-@route.post("/login", response_model=schema.Auth.Token)
+@router.post("/login", response_model=schema.Auth.Token)
 def login(response: Response, credentials: OAuth2PasswordRequestForm = Depends(),
           session: Session = Depends(database.get_session)):
     query = session.query(model.User).filter(model.User.username == credentials.username).all()
@@ -48,7 +48,7 @@ def login(response: Response, credentials: OAuth2PasswordRequestForm = Depends()
 
     return {"access_token": tokens.get("access_token")}
 
-@route.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
+@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
 def logout(response: Response, refresh_payload: dict = Depends(jwtUtil.verify_refresh_token),
            session: Session = Depends(database.get_session), current_user = Depends(jwtUtil.get_current_user)):
     jti = refresh_payload.get("jti")
@@ -66,7 +66,7 @@ def logout(response: Response, refresh_payload: dict = Depends(jwtUtil.verify_re
     response.delete_cookie("refresh_token")
     return
 
-@route.post("/refresh")
+@router.post("/refresh")
 def refresh_access_token(response: Response, refresh_payload: dict = Depends(jwtUtil.verify_refresh_token),
                          session: Session = Depends(database.get_session)):
     user_id = refresh_payload.get("sub")

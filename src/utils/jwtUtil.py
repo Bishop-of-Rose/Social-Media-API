@@ -6,9 +6,9 @@ from fastapi.security import OAuth2PasswordBearer
 from fastapi import Depends, status, HTTPException, Request
 from sqlalchemy.orm import Session
 
-from ..database import get_session
-from .. import schema, database, model
-from ..config import settings
+from src import model, database
+from src.database import get_session
+from src.config import settings
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
@@ -17,22 +17,22 @@ ALGORITHM = settings.ALGORITHM
 ACCESS_TOKEN_EXPIRE_MINUTES = settings.ACCESS_TOKEN_EXPIRE_MINUTES
 REFRESH_TOKEN_EXPIRE_DAYS = settings.REFRESH_TOKEN_EXPIRE_DAYS
 
-def create_tokens(user_id: str):
+def create_tokens(user_id: uuid.UUID):
+    access_jti = uuid.uuid4()
+    refresh_jti = uuid.uuid4()
     access_expire = datetime.now(UTC) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     refresh_expire = datetime.now(UTC) + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
-    access_jti = str(uuid.uuid4())
-    refresh_jti = str(uuid.uuid4())
 
     access_payload = {
-        "sub": user_id,
-        "jti": access_jti,
+        "sub": str(user_id),
+        "jti": str(access_jti),
         "exp": access_expire,
         "type": "access"
     }
 
     refresh_payload = {
-        "sub": user_id,
-        "jti": refresh_jti,
+        "sub": str(user_id),
+        "jti": str(refresh_jti),
         "exp": refresh_expire,
         "type": "refresh"
     }
@@ -62,11 +62,12 @@ def decode_token(token: str, token_type: str):
 
     return payload
 
-def get_current_user(token: str = Depends(oauth2_scheme), session: Session = Depends(database.get_session)):
+def get_current_user(token: str = Depends(oauth2_scheme),
+                     session: Session = Depends(database.get_session)):
     payload = decode_token(token, "access")
 
     user_id = payload.get("sub")
-    user = session.query(model.User).filter(model.User.id == user_id).first()
+    user = session.get(model.User, user_id)
 
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
@@ -74,7 +75,8 @@ def get_current_user(token: str = Depends(oauth2_scheme), session: Session = Dep
 
     return user
 
-def verify_refresh_token(request: Request, session: Session = Depends(get_session)):
+def verify_refresh_token(request: Request,
+                         session: Session = Depends(get_session)):
     refresh_token = request.cookies.get("refresh_token")
     if not refresh_token:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token missing")
@@ -82,7 +84,7 @@ def verify_refresh_token(request: Request, session: Session = Depends(get_sessio
     payload = decode_token(refresh_token, "refresh")
 
     jti = payload.get("jti")
-    is_whitelisted = session.query(model.Whitelist).filter(model.Whitelist.jti == jti).first()
+    is_whitelisted = session.get(model.Whitelist, jti)
 
     if not is_whitelisted:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token has been revoked")

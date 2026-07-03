@@ -4,12 +4,12 @@ from sqlalchemy.orm import Session
 from .. import model, schema, database
 from ..util import passwordUtil, jwtUtil
 
-route = APIRouter(
+router = APIRouter(
     prefix='/users',
     tags=['Users']
 )
 
-@route.post(path='' , status_code=status.HTTP_201_CREATED, response_model=schema.User.UserResponse)
+@router.post(path='' , status_code=status.HTTP_201_CREATED, response_model=schema.User.UserResponse)
 def create_user(user: schema.User.UserCreate, session: Session = Depends(database.get_session)):
     user.password = passwordUtil.hash(user.password)
     user = model.User(**user.dict())
@@ -18,7 +18,7 @@ def create_user(user: schema.User.UserCreate, session: Session = Depends(databas
     session.refresh(user)
     return user
 
-@route.get("/{user_id}", response_model=schema.User.UserResponse)
+@router.get("/{user_id}", response_model=schema.User.UserResponse)
 def read_user(user_id: int, session: Session = Depends(database.get_session)):
     user = session.query(model.User).filter(model.User.id == user_id).first()
     if user:
@@ -27,7 +27,7 @@ def read_user(user_id: int, session: Session = Depends(database.get_session)):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail=f"User with <id: {user_id}> not found")
 
-@route.put("/{user_id}", response_model=schema.User.UserResponse)
+@router.put("/{user_id}", response_model=schema.User.UserResponse)
 def update_user(user_id, edit: schema.User.UserUpdate, session: Session = Depends(database.get_session),
                 current_user = Depends(jwtUtil.get_current_user)):
     query = session.query(model.User).filter(model.User.id == user_id)
@@ -46,7 +46,7 @@ def update_user(user_id, edit: schema.User.UserUpdate, session: Session = Depend
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail=f"User with <id: {user_id}> not found")
 
-@route.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_user(user_id: int, session: Session = Depends(database.get_session),
                 current_user = Depends(jwtUtil.get_current_user)):
     query = session.query(model.User).filter(model.User.id == user_id)
