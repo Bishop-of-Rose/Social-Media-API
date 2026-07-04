@@ -1,43 +1,33 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Response
+from datetime import datetime, UTC
+
+from fastapi import APIRouter, Depends, HTTPException, status, Request, Response
 from fastapi.security.oauth2 import OAuth2PasswordRequestForm
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from ..config import settings
-from ..util import passwordUtil, jwtUtil
-from .. import database, schema, model
+from src import model, database, blacklist
+from src.schemas import auth_schema
+from src.config import settings
+from src.utils import jwtUtil
 
 router = APIRouter(
     prefix='/auth',
     tags=['Authentication']
 )
 
-@router.post("/login", response_model=schema.Auth.Token)
-def login(response: Response, credentials: OAuth2PasswordRequestForm = Depends(),
+@router.post("/login", response_model=auth_schema.Token)
+def login(response: Response,
+          credentials: OAuth2PasswordRequestForm = Depends(),
           session: Session = Depends(database.get_session)):
-    query = session.query(model.User).filter(model.User.username == credentials.username).all()
-    user = None
-    if not query:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
-                            detail=f"Invalid Credentials")
+    stmt = select(model.User).where(model.User.username == credentials.username)
+    user: model.User | None = session.scalars(stmt).one_or_none()
+    session.close()
 
-    for current in query:
-        if passwordUtil.verify(credentials.password, str(current.password)):
-            user = current
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
+                                detail="Invalid Credentials")
 
-    if not user:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
-                                detail=f"Invalid Credentials")
-
-    tokens = jwtUtil.create_tokens(str(user.id))
-    to_whitelist = {
-        "jti": tokens.get("refresh_jti"),
-        "expire": str(tokens.get("refresh_expire"))
-    }
-
-    to_whitelist = model.Whitelist(**to_whitelist)
-    session.add(to_whitelist)
-    session.commit()
-
+    tokens = jwtUtil.tokenize(user.id)
     response.set_cookie(
         key="refresh_token",
         value=tokens.get("refresh_token"),
@@ -48,42 +38,58 @@ def login(response: Response, credentials: OAuth2PasswordRequestForm = Depends()
 
     return {"access_token": tokens.get("access_token")}
 
-@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
-def logout(response: Response, refresh_payload: dict = Depends(jwtUtil.verify_refresh_token),
-           session: Session = Depends(database.get_session), current_user = Depends(jwtUtil.get_current_user)):
-    jti = refresh_payload.get("jti")
-    user_id = refresh_payload.get("sub")
+@router.post("/logout")
+def logout(request: Request,
+           response: Response):
+    auth_header = request.headers.get("Authorization")
+    if not auth_header:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing Authorization Header"
+        )
 
-    if not str(current_user.id) == user_id:
-        print(current_user.id, user_id, type(current_user.id), type(user_id))
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
-                            detail="Unauthorized Logout Attempted")
+    access_token = auth_header.split()[1]
+    access_payload = jwtUtil.detokenize(access_token, "Access")
+    access_jti = access_payload.get("jti")
 
-    whitelisted = session.query(model.Whitelist).filter(model.Whitelist.jti == str(jti))
-    whitelisted.delete(synchronize_session=False)
-    session.commit()
+    if blacklist.get_jti(access_jti):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                            detail="Already logged out")
+
+    remaining_ttl = int(access_payload.get("exp") - datetime.now(UTC).timestamp())
+    if remaining_ttl > 0:
+        blacklist.set_jti(access_jti, remaining_ttl)
 
     response.delete_cookie("refresh_token")
-    return
+    return {"message": "Successfully logged out"}
 
-@router.post("/refresh")
-def refresh_access_token(response: Response, refresh_payload: dict = Depends(jwtUtil.verify_refresh_token),
-                         session: Session = Depends(database.get_session)):
-    user_id = refresh_payload.get("sub")
-    jti = refresh_payload.get("jti")
+@router.post("/refresh", response_model=auth_schema.Token)
+def refresh(request: Request,
+            response: Response):
+    auth_header = request.headers.get("Authorization")
+    if not auth_header:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing Authorization Header"
+        )
 
-    whitelisted = session.query(model.Whitelist).filter(model.Whitelist.jti == str(jti))
-    whitelisted.delete()
+    access_token = auth_header.split()[1]
+    refresh_token = request.cookies.get("refresh_token")
+    access_payload = jwtUtil.detokenize(access_token, "Access", suppress=True)
+    refresh_payload = jwtUtil.detokenize(refresh_token, "Refresh")
 
-    tokens = jwtUtil.create_tokens(str(user_id))
-    to_whitelist = {
-        "jti": tokens.get("refresh_jti"),
-        "expire": str(tokens.get("refresh_expire"))
-    }
+    access_jti = access_payload.get("jti")
+    refresh_jti = refresh_payload.get("jti")
+    if access_jti != refresh_jti:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                            detail='Access and Refresh tokens not matched')
 
-    to_whitelist = model.Whitelist(**to_whitelist)
-    session.add(to_whitelist)
-    session.commit()
+    remaining_ttl = int(access_payload.get("exp") - datetime.now(UTC).timestamp())
+    if remaining_ttl > 0:
+        blacklist.set_jti(access_jti, remaining_ttl)
+
+    user_id = access_payload.get("sub")
+    tokens = jwtUtil.tokenize(user_id)
 
     response.set_cookie(
         key="refresh_token",

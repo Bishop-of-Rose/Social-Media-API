@@ -1,72 +1,81 @@
-from fastapi import Depends, APIRouter, HTTPException, status
+from fastapi import Depends, HTTPException, status, APIRouter
+from psycopg2.errors import UniqueViolation, ForeignKeyViolation
+from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from .. import model, schema, database
-from ..util import jwtUtil
+from src import model, database, dependencies
+from src.schemas import vote_schema
 
 router = APIRouter(
-    prefix='/votes',
-    tags=['Votes']
+    prefix="/votes",
+    tags=["Votes"],
 )
 
-@router.post("")
-def vote(vote: schema.Vote.VoteBase, session: Session = Depends(database.get_session),
-         current_user = Depends(jwtUtil.get_current_user)):
-    post_query = session.query(model.Post).filter(model.Post.id == vote.post_id)
-    if not post_query.first():
+@router.post("", status_code=status.HTTP_201_CREATED)
+def create_vote(vote: vote_schema.Create,
+                session: Session = Depends(database.get_session),
+                current_user = Depends(dependencies.get_current_user)):
+    vote = model.Vote(**vote.model_dump())
+    vote.user_id = current_user.id
+    ref_type = "post" if vote.comment_id is None else "comment"
+
+    try:
+        session.add(vote)
+        session.commit()
+        session.refresh(vote)
+        session.close()
+
+    except IntegrityError as e:
+        print(e)
+
+        if isinstance(e.orig, UniqueViolation):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                            detail=f"User already has a vote on this {ref_type}")
+
+        elif isinstance(e.orig, ForeignKeyViolation):
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                                detail=f"Vote reference {ref_type} not found")
+
+    return {"message": "Vote successfully created"}
+
+@router.put("", status_code=status.HTTP_202_ACCEPTED)
+def update_vote(vote: vote_schema.Update,
+                session: Session = Depends(database.get_session),
+                current_user = Depends(dependencies.get_current_user)):
+    ref_type = "post" if vote.comment_id is None else "comment"
+    stmt = (select(model.Vote)
+            .where(model.Vote.user_id == current_user.id)
+            .where(model.Vote.post_id == vote.post_id)
+            .where(model.Vote.comment_id == vote.comment_id)
+            )
+    result = session.scalars(stmt).one_or_none()
+    if result is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
-                            detail=f"Post with <id: {vote.post_id}> not found>"
-                            )
+                            detail=f"User has no vote on this {ref_type}")
 
-    query = (session.query(model.Vote)
-             .filter(model.Vote.vote_post_id == vote.post_id,
-                     model.Vote.vote_user_id == current_user.id))
+    result.type = vote.type
+    session.commit()
+    session.close()
+    return {"message": "Vote successfully updated"}
 
-    if vote.dir:
-        if query.first():
-            if query.first().type == vote.type:
-                raise HTTPException(status_code=status.HTTP_409_CONFLICT,
-                                    detail=f"User with <id: {current_user.id}> has a {vote.type} on post with <id: {vote.post_id}>")
+@router.delete("", status_code=status.HTTP_202_ACCEPTED)
+def delete_vote(vote: vote_schema.Base,
+                session: Session = Depends(database.get_session),
+                current_user = Depends(dependencies.get_current_user)):
+    ref_type = "post" if vote.comment_id is None else "comment"
+    stmt = (select(model.Vote)
+            .where(model.Vote.user_id == current_user.id)
+            .where(model.Vote.post_id == vote.post_id)
+            .where(model.Vote.comment_id == vote.comment_id)
+            )
 
-            elif query.first().type == "like":
-                query.update({"type": "dislike"}, synchronize_session=False)
-                post_query.update({"likes": post_query.first().likes - 1})
+    result = session.scalars(stmt).one_or_none()
+    if result is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail=f"User has no vote on this {ref_type}")
 
-            elif query.first().type == "dislike":
-                query.update({"type": "like"}, synchronize_session=False)
-                post_query.update({"dislikes": post_query.first().dislikes - 1})
-
-        else:
-            session.add(model.Vote(vote_post_id=vote.post_id, vote_user_id=current_user.id, type=vote.type))
-
-        if vote.type == "like":
-            post_query.update({"likes": post_query.first().likes + 1}, synchronize_session=False)
-
-        elif vote.type == "dislike":
-            post_query.update({"dislikes": post_query.first().dislikes + 1}, synchronize_session=False)
-
-        session.commit()
-        return {"message": f"Successfully added {vote.type}"}
-
-    else:
-        if not query.first():
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
-                                detail=f"User with <id: {current_user.id}> has no {vote.type} on post with <id: {vote.post_id}>")
-
-        if vote.type == "like" and query.first().type == "like":
-            post_query.update({"likes": post_query.first().likes - 1}, synchronize_session=False)
-
-        elif vote.type == "dislike" and query.first().type == "dislike":
-            post_query.update({"dislikes": post_query.first().dislikes - 1}, synchronize_session=False)
-
-        elif vote.type == "like" and query.first().type == "dislike":
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
-                                detail=f"User with <id: {current_user.id}> has no {vote.type} on post with <id: {vote.post_id}>")
-
-        elif vote.type == "dislike" and query.first().type == "like":
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
-                                detail=f"User with <id: {current_user.id}> has no {vote.type} on post with <id: {vote.post_id}>")
-
-        query.delete(synchronize_session=False)
-        session.commit()
-        return {"message": f"Successfully deleted {vote.type}"}
+    session.delete(result)
+    session.commit()
+    session.close()
+    return {"message": "Vote successfully deleted"}
