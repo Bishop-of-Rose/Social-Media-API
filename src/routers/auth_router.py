@@ -6,8 +6,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from src import model, database, blacklist
-from src.schemas import auth_schema
 from src.config import settings
+from src.schemas import auth_schema
 from src.utils import jwtUtil
 
 router = APIRouter(
@@ -21,7 +21,6 @@ def login(response: Response,
           session: Session = Depends(database.get_session)):
     stmt = select(model.User).where(model.User.username == credentials.username)
     user: model.User | None = session.scalars(stmt).one_or_none()
-    session.close()
 
     if user is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,

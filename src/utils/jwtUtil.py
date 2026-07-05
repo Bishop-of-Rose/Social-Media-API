@@ -1,12 +1,10 @@
-import jwt
 import uuid
 from datetime import datetime, timedelta, UTC
 
-from fastapi.security import OAuth2PasswordBearer
+import jwt
 from fastapi import status, HTTPException
-from src.config import settings
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
+from src.config import settings
 
 SECRET_KEY = settings.SECRET_KEY
 ALGORITHM = settings.ALGORITHM

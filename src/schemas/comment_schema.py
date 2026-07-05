@@ -1,10 +1,11 @@
-from typing import List
 from datetime import datetime
+from typing import List
 from uuid import UUID
 
 from pydantic import BaseModel, model_validator, computed_field
 
 from src.schemas import user_schema
+
 
 class Base(BaseModel):
     commented: UUID | None = None

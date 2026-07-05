@@ -22,7 +22,6 @@ def filter_post(session: Session = Depends(database.get_session),
             .limit(limit)
             .offset(skip))
     posts = session.scalars(stmt).all()
-    session.close()
     return posts
 
 @router.post("", status_code=status.HTTP_201_CREATED, response_model=post_schema.Response)
@@ -34,7 +33,6 @@ def create_post(post: post_schema.Create,
     session.add(post)
     session.commit()
     session.refresh(post)
-    session.close()
     return post
 
 @router.get("/{post_id}", response_model=post_schema.Response)
@@ -43,7 +41,6 @@ def read_post(post_id: uuid.UUID,
               current_user = Depends(dependencies.get_current_user)):
 
     post = session.get(model.Post, post_id)
-    session.close()
     if post is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail=f"Post not found")
@@ -66,7 +63,6 @@ def update_post(post_id: uuid.UUID, edit: post_schema.Update,
     post.content = edit.content
     session.commit()
     session.refresh(post)
-    session.close()
     return post
 
 @router.delete("/{post_id}", status_code=status.HTTP_202_ACCEPTED)
@@ -84,5 +80,4 @@ def delete_post(post_id: uuid.UUID,
 
     session.delete(post)
     session.commit()
-    session.close()
     return {"message": "Post successfully deleted"}

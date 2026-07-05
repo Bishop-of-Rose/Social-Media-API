@@ -1,11 +1,12 @@
-from typing import List
 from datetime import datetime
+from typing import List
 from uuid import UUID
 
 from pydantic import BaseModel, computed_field
 from pygments.styles import default
 
 from src.schemas import user_schema, comment_schema
+
 
 class Base(BaseModel):
     content: str

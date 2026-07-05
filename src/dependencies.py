@@ -18,7 +18,6 @@ def get_current_user(token: str = Depends(oauth2_scheme),
 
     user_id = access_payload.get("sub")
     user = session.get(model.User, user_id)
-    session.close()
 
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,

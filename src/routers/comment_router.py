@@ -26,7 +26,6 @@ def create_comment(comment: comment_schema.Create,
         session.add(comment)
         session.commit()
         session.refresh(comment)
-        session.close()
 
     except IntegrityError as e:
         print(e)
@@ -41,8 +40,6 @@ def read_comment(comment_id: uuid.UUID,
                  session: Session = Depends(database.get_session),
                  current_user = Depends(dependencies.get_current_user)):
     comment = session.get(model.Comment, comment_id)
-    session.close()
-
     if comment is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail="Comment not found")
@@ -66,7 +63,6 @@ def update_comment(comment_id: uuid.UUID,
     comment.content = edit.content
     session.commit()
     session.refresh(comment)
-    session.close()
     return comment
 
 @router.delete("/{comment_id}", status_code=status.HTTP_202_ACCEPTED)
@@ -84,5 +80,4 @@ def delete_comment(comment_id: uuid.UUID,
 
     session.delete(comment)
     session.commit()
-    session.close()
     return {"message": "Comment successfully deleted"}

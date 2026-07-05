@@ -7,6 +7,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship, column_property
 
 from .database import Base
 
+
 class Vote(Base):
     __tablename__ = "votes"
 

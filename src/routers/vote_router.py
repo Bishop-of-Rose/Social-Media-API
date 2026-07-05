@@ -24,7 +24,6 @@ def create_vote(vote: vote_schema.Create,
         session.add(vote)
         session.commit()
         session.refresh(vote)
-        session.close()
 
     except IntegrityError as e:
         print(e)
@@ -56,7 +55,6 @@ def update_vote(vote: vote_schema.Update,
 
     result.type = vote.type
     session.commit()
-    session.close()
     return {"message": "Vote successfully updated"}
 
 @router.delete("", status_code=status.HTTP_202_ACCEPTED)
@@ -77,5 +75,4 @@ def delete_vote(vote: vote_schema.Base,
 
     session.delete(result)
     session.commit()
-    session.close()
     return {"message": "Vote successfully deleted"}

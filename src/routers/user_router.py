@@ -24,7 +24,6 @@ def register(user: user_schema.Create,
         session.add(user)
         session.commit()
         session.refresh(user)
-        session.close()
 
     except IntegrityError as e:
         print(e)
@@ -40,7 +39,6 @@ def read_user(user_id: uuid.UUID,
               session: Session = Depends(database.get_session),
               current_user = Depends(dependencies.get_current_user)):
     user = session.get(model.User, user_id)
-    session.close()
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail="User not found")
@@ -65,7 +63,6 @@ def update_user(user_id: uuid.UUID,
     user.password = passwordUtil.hash(edit.password)
     session.commit()
     session.refresh(user)
-    session.close()
     return user
 
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -83,5 +80,4 @@ def delete_user(user_id: uuid.UUID,
 
     session.delete(user)
     session.commit()
-    session.close()
     return
