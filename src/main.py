@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .routers import post_router, user_router, auth_router, comment_router, vote_router
 
-origins = ["*"]
+origins = ["http://localhost:63342"]
 app = FastAPI()
 
 app.add_middleware(

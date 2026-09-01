@@ -20,7 +20,9 @@ def filter_post(session: Session = Depends(database.get_session),
     stmt = (select(model.Post)
             .where(model.Post.content.contains(search))
             .limit(limit)
-            .offset(skip))
+            .offset(skip)
+            .order_by(model.Post.created_at.desc()))
+
     posts = session.scalars(stmt).all()
     return posts
 

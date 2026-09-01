@@ -1,4 +1,4 @@
-import uuid
+from uuid import UUID
 
 from fastapi import Depends, HTTPException, status, APIRouter
 from psycopg2.errors import ForeignKeyViolation
@@ -20,7 +20,6 @@ def create_comment(comment: comment_schema.Create,
                    ):
     comment = model.Comment(**comment.model_dump())
     comment.user_id = current_user.id
-    ref_type = "post" if comment.replied is None else "comment"
 
     try:
         session.add(comment)
@@ -28,15 +27,14 @@ def create_comment(comment: comment_schema.Create,
         session.refresh(comment)
 
     except IntegrityError as e:
-        print(e)
         if isinstance(e.orig, ForeignKeyViolation):
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
-                                detail=f"Comment reference {ref_type} not found")
+                                detail="Post not found")
 
     return comment
 
 @router.get("/{comment_id}", response_model=comment_schema.Response)
-def read_comment(comment_id: uuid.UUID,
+def read_comment(comment_id: UUID,
                  session: Session = Depends(database.get_session),
                  current_user = Depends(dependencies.get_current_user)):
     comment = session.get(model.Comment, comment_id)
@@ -47,7 +45,7 @@ def read_comment(comment_id: uuid.UUID,
     return comment
 
 @router.put("/{comment_id}", status_code=status.HTTP_202_ACCEPTED, response_model=comment_schema.Response)
-def update_comment(comment_id: uuid.UUID,
+def update_comment(comment_id: UUID,
                    edit: comment_schema.Update,
                    session: Session = Depends(database.get_session),
                    current_user = Depends(dependencies.get_current_user)):
@@ -66,7 +64,7 @@ def update_comment(comment_id: uuid.UUID,
     return comment
 
 @router.delete("/{comment_id}", status_code=status.HTTP_202_ACCEPTED)
-def delete_comment(comment_id: uuid.UUID,
+def delete_comment(comment_id: UUID,
                    session: Session = Depends(database.get_session),
                    current_user = Depends(dependencies.get_current_user)):
     comment = session.get(model.Comment, comment_id)

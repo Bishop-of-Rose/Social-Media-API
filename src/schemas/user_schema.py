@@ -1,20 +1,30 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 
-
-class Base(BaseModel):
+class Create(BaseModel):
     username: str
-
-class Create(Base):
     password: str
 
-class Update(Base):
-    password: str
+class Update(BaseModel):
+    username: str | None = None
+    password: str | None = None
 
-class Response(Base):
+    @model_validator(mode='after')
+    def user_update(self):
+        no_username = self.username is None
+        no_password = self.password is None
+
+        print(self.password, type(self.password))
+        if no_username and no_password:
+            raise ValueError('Username and password fields can not both be empty')
+
+        return self
+
+class Response(BaseModel):
     id: UUID
+    username: str
     created_at: datetime
     updated_at: datetime
 

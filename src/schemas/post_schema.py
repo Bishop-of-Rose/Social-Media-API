@@ -3,13 +3,14 @@ from typing import List
 from uuid import UUID
 
 from pydantic import BaseModel, computed_field
-from pygments.styles import default
 
 from src.schemas import user_schema, comment_schema
 
 
 class Base(BaseModel):
     content: str
+    tags: List[str] = []
+    media: List[str] = []
 
 class Create(Base):
     pass

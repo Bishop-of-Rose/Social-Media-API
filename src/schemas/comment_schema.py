@@ -2,31 +2,24 @@ from datetime import datetime
 from typing import List
 from uuid import UUID
 
-from pydantic import BaseModel, model_validator, computed_field
+from pydantic import BaseModel, computed_field
 
 from src.schemas import user_schema
 
 
 class Base(BaseModel):
-    commented: UUID | None = None
-    replied: UUID | None = None
+    post_id: UUID
     content: str
-
-    @model_validator(mode="after")
-    def comment_src(self):
-        has_commented = self.commented is not None
-        has_replied = self.replied is not None
-
-        if has_commented == has_replied:
-            raise ValueError("Comment reference <commented | replied> can not be both or neither.")
-
-        return self
+    tags: List[str] = []
+    media: List[str] = []
 
 class Create(Base):
     pass
 
 class Update(BaseModel):
     content: str
+    tags: List[str] = []
+    media: List[str] = []
 
 class Response(Base):
     id: UUID
@@ -35,7 +28,6 @@ class Response(Base):
     created_at: datetime
     updated_at: datetime
     author: user_schema.Response
-    replies: List[Response]
 
     @computed_field
     @property

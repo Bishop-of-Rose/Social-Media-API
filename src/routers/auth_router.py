@@ -7,32 +7,35 @@ from sqlalchemy.orm import Session
 
 from src import model, database, blacklist
 from src.config import settings
-from src.schemas import auth_schema
-from src.utils import jwtUtil
+from src.utils import jwtUtil, passwordUtil
 
 router = APIRouter(
     prefix='/auth',
     tags=['Authentication']
 )
 
-@router.post("/login", response_model=auth_schema.Token)
+@router.post("/login")
 def login(response: Response,
           credentials: OAuth2PasswordRequestForm = Depends(),
           session: Session = Depends(database.get_session)):
     stmt = select(model.User).where(model.User.username == credentials.username)
-    user: model.User | None = session.scalars(stmt).one_or_none()
+    user = session.scalars(stmt).one_or_none()
+
+    if not passwordUtil.verify(credentials.password, user.password):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                                detail="Invalid Credentials")
 
     if user is None:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                                 detail="Invalid Credentials")
 
     tokens = jwtUtil.tokenize(user.id)
     response.set_cookie(
-        key="refresh_token",
-        value=tokens.get("refresh_token"),
+        key='refresh_token',
+        value=tokens.get('refresh_token'),
         httponly=True,
+        samesite='lax',
         max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
-        secure=False
     )
 
     return {"access_token": tokens.get("access_token")}
@@ -62,7 +65,7 @@ def logout(request: Request,
     response.delete_cookie("refresh_token")
     return {"message": "Successfully logged out"}
 
-@router.post("/refresh", response_model=auth_schema.Token)
+@router.post("/refresh")
 def refresh(request: Request,
             response: Response):
     auth_header = request.headers.get("Authorization")
@@ -90,12 +93,13 @@ def refresh(request: Request,
     user_id = access_payload.get("sub")
     tokens = jwtUtil.tokenize(user_id)
 
+    response.delete_cookie("refresh_token")
     response.set_cookie(
-        key="refresh_token",
-        value=tokens.get("refresh_token"),
+        key='refresh_token',
+        value=tokens.get('refresh_token'),
         httponly=True,
+        samesite='lax',
         max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
-        secure=False
     )
 
     return {"access_token": tokens.get("access_token")}

@@ -13,7 +13,7 @@ def get_current_user(token: str = Depends(oauth2_scheme),
     access_jti = access_payload.get("jti")
 
     if blacklist.get_jti(access_jti):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                             detail="Already logged out")
 
     user_id = access_payload.get("sub")

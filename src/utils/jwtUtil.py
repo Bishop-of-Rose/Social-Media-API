@@ -43,9 +43,9 @@ def detokenize(token: str | None, token_type: str, suppress: bool = False):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
                             detail=f"{token_type} token not found")
 
+
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=ALGORITHM)
-
         if payload.get("sub") is None:
             raise token_exception
 
@@ -56,9 +56,8 @@ def detokenize(token: str | None, token_type: str, suppress: bool = False):
         if suppress:
             return jwt.decode(token, SECRET_KEY, algorithms=ALGORITHM, options={"verify_exp": False})
 
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
                             detail=f"{token_type} token has expired")
-
 
     except jwt.InvalidTokenError:
         raise token_exception

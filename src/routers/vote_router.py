@@ -1,8 +1,8 @@
 from fastapi import Depends, HTTPException, status, APIRouter
-from psycopg2.errors import UniqueViolation, ForeignKeyViolation
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
+from psycopg2.errors import UniqueViolation, ForeignKeyViolation
 
 from src import model, database, dependencies
 from src.schemas import vote_schema
@@ -26,8 +26,6 @@ def create_vote(vote: vote_schema.Create,
         session.refresh(vote)
 
     except IntegrityError as e:
-        print(e)
-
         if isinstance(e.orig, UniqueViolation):
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                             detail=f"User already has a vote on this {ref_type}")
@@ -48,6 +46,7 @@ def update_vote(vote: vote_schema.Update,
             .where(model.Vote.post_id == vote.post_id)
             .where(model.Vote.comment_id == vote.comment_id)
             )
+
     result = session.scalars(stmt).one_or_none()
     if result is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
