@@ -2,7 +2,9 @@ import uuid
 
 import redis
 
-redis_client = redis.Redis(host="localhost", port=6379, decode_responses=True)
+from src.config import settings
+
+redis_client = redis.from_url(settings.REDIS_URL)
 
 def set_jti(jti: uuid.UUID, remaining_ttl: int) -> None:
     redis_client.set(f"{jti}", "revoked", ex=remaining_ttl)
