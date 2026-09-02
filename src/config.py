@@ -2,6 +2,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     REDIS_URL: str
+    ORIGIN: str
     DATABASE_HOSTNAME: str
     DATABASE_PORT: str
     DATABASE_USERNAME: str

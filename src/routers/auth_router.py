@@ -21,11 +21,11 @@ def login(response: Response,
     stmt = select(model.User).where(model.User.username == credentials.username)
     user = session.scalars(stmt).one_or_none()
 
-    if not passwordUtil.verify(credentials.password, user.password):
+    if user is None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                                 detail="Invalid Credentials")
 
-    if user is None:
+    if not passwordUtil.verify(credentials.password, user.password):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                                 detail="Invalid Credentials")
 
